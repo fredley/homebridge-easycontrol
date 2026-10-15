@@ -1,0 +1,52 @@
+{
+  "pluginAlias": "HomeComPlatform",
+  "pluginType": "platform",
+  "singular": true,
+  "customUi": true,
+  "headerDisplay": "Bosch EasyControl CT200 via the HomeCom cloud API. Log in with your Bosch SingleKey ID using the panel above.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "Bosch CT200",
+        "required": true
+      },
+      "pollInterval": {
+        "title": "Poll interval (seconds)",
+        "type": "integer",
+        "default": 60,
+        "minimum": 30,
+        "description": "How often to read the thermostat from Bosch's cloud. Changes made in HomeKit are re-read a few seconds later regardless."
+      },
+      "setpointBehaviour": {
+        "title": "Changing the temperature while on the schedule",
+        "type": "string",
+        "default": "override",
+        "oneOf": [
+          { "title": "Temporary override until the next schedule change (like turning the dial)", "enum": ["override"] },
+          { "title": "Switch the zone to manual mode", "enum": ["manual"] }
+        ]
+      },
+      "showOutdoorTemperature": { "title": "Show outdoor temperature sensor", "type": "boolean", "default": true },
+      "showAway": { "title": "Show Away switch", "type": "boolean", "default": true },
+      "showBoost": { "title": "Show Boost switch", "type": "boolean", "default": true },
+      "boostTemperature": {
+        "title": "Boost temperature (°C)",
+        "type": "number",
+        "minimum": 5,
+        "maximum": 30,
+        "multipleOf": 0.5,
+        "description": "Leave empty to use the value set in the EasyControl app."
+      },
+      "boostDuration": {
+        "title": "Boost duration (hours)",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 8,
+        "description": "Leave empty to use the value set in the EasyControl app."
+      }
+    }
+  }
+}

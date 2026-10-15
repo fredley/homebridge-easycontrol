@@ -1,0 +1,67 @@
+<div class="card mb-3">
+  <div class="card-body">
+    <h5 class="card-title">Bosch account</h5>
+    <p id="status" class="mb-2">Checking login…</p>
+
+    <div id="login" style="display: none">
+      <ol class="ps-3">
+        <li class="mb-2">
+          <button id="start" class="btn btn-primary btn-sm">Open Bosch login</button>
+          <div class="form-text">Sign in with your Bosch SingleKey ID in the new tab. Open the browser's developer tools (Network tab, with "Preserve log" ticked) before signing in.</div>
+        </li>
+        <li class="mb-2">
+          After signing in the browser tries to open a link starting <code>com.bosch.tt.dashtt.pointt://app/login?code=</code> and fails.
+          Find it in the Network tab (the <code>authorize/callback</code> request's <code>Location</code> response header) and paste it here:
+          <input id="callback" class="form-control form-control-sm mt-1" placeholder="com.bosch.tt.dashtt.pointt://app/login?code=…" autocomplete="off">
+        </li>
+        <li>
+          <button id="finish" class="btn btn-success btn-sm">Complete login</button>
+          <div class="form-text">The code expires after a few minutes. If it's rejected, start again.</div>
+        </li>
+      </ol>
+    </div>
+    <button id="relogin" class="btn btn-outline-secondary btn-sm" style="display: none">Log in again</button>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function show(loggedIn) {
+    $('status').textContent = loggedIn
+      ? 'Logged in. Restart Homebridge (or the child bridge) after logging in for the first time.'
+      : 'Not logged in.';
+    $('login').style.display = loggedIn ? 'none' : '';
+    $('relogin').style.display = loggedIn ? '' : 'none';
+  }
+
+  $('start').addEventListener('click', async () => {
+    const { url } = await homebridge.request('/start');
+    window.open(url, '_blank', 'noopener');
+  });
+
+  $('finish').addEventListener('click', async () => {
+    homebridge.showSpinner();
+    try {
+      await homebridge.request('/finish', { callbackUrl: $('callback').value });
+      homebridge.toast.success('Logged in to Bosch HomeCom');
+      $('callback').value = '';
+      show(true);
+    } catch (err) {
+      homebridge.toast.error(err.message, 'Login failed');
+    } finally {
+      homebridge.hideSpinner();
+    }
+  });
+
+  $('relogin').addEventListener('click', () => show(false));
+
+  (async () => {
+    homebridge.showSchemaForm();
+    try {
+      show((await homebridge.request('/status')).loggedIn);
+    } catch (err) {
+      $('status').textContent = `Couldn't check login: ${err.message}`;
+    }
+  })();
+</script>
