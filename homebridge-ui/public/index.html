@@ -24,6 +24,50 @@
   </div>
 </div>
 
+<div id="schedules" class="card mb-3" style="display: none">
+  <div class="card-body">
+    <h5 class="card-title">Heating schedules</h5>
+    <p id="sched-status" class="mb-2 text-muted">Loading schedules…</p>
+
+    <div id="zones"></div>
+
+    <div id="editor" style="display: none">
+      <hr>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <label for="program" class="mb-0"><strong>Edit schedule</strong></label>
+        <select id="program" class="form-select form-select-sm" style="width: auto"></select>
+      </div>
+      <div class="ec-legend form-text mb-2">
+        Each switch point sets the target temperature from that time until the next one.
+        Times are in 15-minute steps; up to 6 switch points per day.
+      </div>
+      <div id="days"></div>
+      <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+        <button id="save" class="btn btn-primary btn-sm" disabled>Save to thermostat</button>
+        <button id="revert" class="btn btn-outline-secondary btn-sm" disabled>Discard changes</button>
+        <span id="dirty" class="form-text"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ec-day { display: grid; grid-template-columns: 6.5rem 1fr; gap: .5rem; padding: .5rem 0; border-top: 1px solid rgba(128,128,128,.25); }
+  .ec-day:first-child { border-top: 0; }
+  .ec-dayname { font-weight: 600; padding-top: .25rem; }
+  .ec-dayname.ec-changed::after { content: " •"; color: var(--bs-primary, #0d6efd); }
+  .ec-bar { display: flex; height: .6rem; border-radius: .3rem; overflow: hidden; margin-bottom: .4rem; }
+  .ec-bar > div { height: 100%; }
+  .ec-points { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+  .ec-point { display: inline-flex; align-items: center; gap: .2rem; border: 1px solid rgba(128,128,128,.4); border-radius: .3rem; padding: .15rem .3rem; }
+  .ec-point input[type=time] { width: 6.2rem; }
+  .ec-point input[type=number] { width: 4.2rem; }
+  .ec-point .btn { padding: 0 .35rem; line-height: 1.4; }
+  .ec-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
+  .ec-zone { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .4rem; }
+  @media (max-width: 480px) { .ec-day { grid-template-columns: 1fr; } }
+</style>
+
 <script>
   const $ = (id) => document.getElementById(id);
 
@@ -61,6 +105,7 @@
       homebridge.toast.success('Logged in to Bosch. Restart Homebridge to load the thermostat.');
       $('callback').value = '';
       show(true);
+      void loadSchedules();
     } catch (err) {
       homebridge.toast.error(err.message, 'Login failed');
     } finally {
@@ -70,11 +115,203 @@
 
   $('relogin').addEventListener('click', () => show(false));
 
+  // ---- Schedules -------------------------------------------------------------
+  const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const DAY_LABEL = { monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' };
+  const COPY_TARGETS = { weekdays: DAYS.slice(0, 5), weekend: DAYS.slice(5), all: DAYS };
+  const MAX_POINTS = 6;
+  const sched = { gateway: undefined, program: undefined, original: {}, draft: {} };
+
+  const el = (tag, props = {}, ...children) => {
+    const node = Object.assign(document.createElement(tag), props);
+    children.forEach((c) => node.append(c));
+    return node;
+  };
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const toTime = (t) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+  const fromTime = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+  // Blue at 12 °C and below, through green and orange, to red at 22 °C and above.
+  const tempColour = (th) => `hsl(${Math.round(220 - Math.min(Math.max((th - 12) / 10, 0), 1) * 220)}, 75%, 52%)`;
+  const sameDay = (a, b) => a.length === b.length && a.every((p, i) => p.t === b[i].t && p.Th === b[i].Th);
+  const changed = () => DAYS.filter((d) => !sameDay(sched.original[d], sched.draft[d]));
+
+  async function loadSchedules() {
+    $('schedules').style.display = '';
+    try {
+      const gateways = await homebridge.request('/schedules');
+      sched.gateway = gateways[0];
+      if (!sched.gateway) {
+        $('sched-status').textContent = 'No EasyControl thermostat found on this Bosch account.';
+        return;
+      }
+      $('sched-status').textContent = '';
+      renderZones();
+      if (sched.gateway.programs.length) {
+        selectProgram(sched.program ?? sched.gateway.programs[0].id);
+        $('editor').style.display = '';
+      } else {
+        $('sched-status').textContent = 'This thermostat has no schedules yet. Create one in the EasyControl app first.';
+      }
+    } catch (err) {
+      $('sched-status').textContent = `Couldn't load schedules: ${err.message}`;
+    }
+  }
+
+  function renderZones() {
+    const { zones, programs } = sched.gateway;
+    $('zones').replaceChildren(el('div', { className: 'form-text mb-2', textContent:
+      'Which schedule each zone follows while the thermostat is in schedule (Auto) mode.' }));
+    for (const zone of zones) {
+      const select = el('select', { className: 'form-select form-select-sm', style: 'width: auto' },
+        el('option', { value: '0', textContent: 'No schedule (fixed temperature)' }),
+        ...programs.map((p) => el('option', { value: String(p.id), textContent: p.name })));
+      select.value = String(zone.program);
+      const apply = el('button', { className: 'btn btn-outline-primary btn-sm', textContent: 'Apply', disabled: true });
+      select.addEventListener('change', () => { apply.disabled = select.value === String(zone.program); });
+      apply.addEventListener('click', async () => {
+        homebridge.showSpinner();
+        try {
+          await homebridge.request('/schedules/assign', { gatewayId: sched.gateway.gatewayId, zone: zone.id, program: Number(select.value) });
+          zone.program = Number(select.value);
+          apply.disabled = true;
+          homebridge.toast.success(`${zone.name} now follows: ${select.selectedOptions[0].textContent}`);
+        } catch (err) {
+          homebridge.toast.error(err.message, 'Could not change schedule');
+        } finally {
+          homebridge.hideSpinner();
+        }
+      });
+      $('zones').append(el('div', { className: 'ec-zone' }, el('strong', { textContent: zone.name }), select, apply));
+    }
+  }
+
+  function selectProgram(id) {
+    const program = sched.gateway.programs.find((p) => p.id === id) ?? sched.gateway.programs[0];
+    sched.program = program.id;
+    sched.original = clone(program.days);
+    sched.draft = clone(program.days);
+    $('program').replaceChildren(...sched.gateway.programs.map((p) => el('option', { value: String(p.id), textContent: p.name })));
+    $('program').value = String(program.id);
+    renderDays();
+  }
+
+  $('program').addEventListener('change', (e) => {
+    if (changed().length) {
+      homebridge.toast.warning('Save or discard your changes before switching schedules.');
+      e.target.value = String(sched.program);
+      return;
+    }
+    selectProgram(Number(e.target.value));
+  });
+
+  function bar(day) {
+    // Before the first switch point the previous day's last temperature applies.
+    const points = sched.draft[day];
+    const prev = sched.draft[DAYS[(DAYS.indexOf(day) + 6) % 7]];
+    const carry = prev.length ? prev[prev.length - 1].Th : points[0]?.Th;
+    const edges = [{ t: 0, Th: carry }, ...points, { t: 1440 }];
+    const segments = [];
+    for (let i = 0; i < edges.length - 1; i++) {
+      const width = edges[i + 1].t - edges[i].t;
+      if (width > 0 && edges[i].Th !== undefined) {
+        segments.push(el('div', { title: `${toTime(edges[i].t)} ${edges[i].Th} °C`,
+          style: `width: ${(width / 1440) * 100}%; background: ${tempColour(edges[i].Th)}` }));
+      }
+    }
+    return el('div', { className: 'ec-bar' }, ...segments);
+  }
+
+  function renderDays() {
+    const dirty = changed();
+    $('days').replaceChildren(...DAYS.map((day) => {
+      const points = sched.draft[day];
+      const list = el('div', { className: 'ec-points' }, ...points.map((p, i) => {
+        const time = el('input', { type: 'time', step: 900, value: toTime(p.t), className: 'form-control form-control-sm', ariaLabel: `${DAY_LABEL[day]} switch time` });
+        const temp = el('input', { type: 'number', min: 5, max: 30, step: 0.5, value: p.Th, className: 'form-control form-control-sm', ariaLabel: `${DAY_LABEL[day]} temperature` });
+        const remove = el('button', { className: 'btn btn-outline-danger btn-sm', textContent: '×', title: 'Remove', disabled: points.length === 1 });
+        time.addEventListener('change', () => { if (time.value) { p.t = fromTime(time.value); sortAndRender(day); } });
+        temp.addEventListener('change', () => { p.Th = Number(temp.value); renderDays(); });
+        remove.addEventListener('click', () => { points.splice(i, 1); renderDays(); });
+        return el('span', { className: 'ec-point' }, time, temp, el('span', { textContent: '°C' }), remove);
+      }));
+
+      const add = el('button', { className: 'btn btn-outline-secondary btn-sm', textContent: '+ Switch point', disabled: points.length >= MAX_POINTS });
+      add.addEventListener('click', () => {
+        // Put the new point in the middle of the largest gap, on a 15-minute boundary.
+        const edges = [0, ...points.map((p) => p.t), 1440];
+        let best = { t: 420, size: -1, Th: 20 };
+        for (let i = 0; i < edges.length - 1; i++) {
+          const size = edges[i + 1] - edges[i];
+          const t = Math.round((edges[i] + size / 2) / 15) * 15;
+          if (size > best.size && !points.some((p) => p.t === t)) {
+            best = { t, size, Th: points[Math.max(i - 1, 0)]?.Th ?? 20 };
+          }
+        }
+        points.push({ t: best.t, Th: best.Th });
+        sortAndRender(day);
+      });
+
+      const copy = el('select', { className: 'form-select form-select-sm', style: 'width: auto' },
+        el('option', { value: '', textContent: 'Copy this day to…' }),
+        el('option', { value: 'weekdays', textContent: 'Weekdays' }),
+        el('option', { value: 'weekend', textContent: 'Weekend' }),
+        el('option', { value: 'all', textContent: 'Every day' }));
+      copy.addEventListener('change', () => {
+        for (const target of COPY_TARGETS[copy.value] ?? []) {
+          sched.draft[target] = clone(points);
+        }
+        renderDays();
+      });
+
+      return el('div', { className: 'ec-day' },
+        el('div', { className: `ec-dayname${dirty.includes(day) ? ' ec-changed' : ''}`, textContent: DAY_LABEL[day] }),
+        el('div', {}, bar(day), list, el('div', { className: 'ec-actions' }, add, copy)));
+    }));
+    $('save').disabled = $('revert').disabled = !dirty.length;
+    $('dirty').textContent = dirty.length ? `Unsaved changes: ${dirty.map((d) => DAY_LABEL[d]).join(', ')}` : '';
+  }
+
+  function sortAndRender(day) {
+    sched.draft[day].sort((a, b) => a.t - b.t);
+    renderDays();
+  }
+
+  $('revert').addEventListener('click', () => {
+    sched.draft = clone(sched.original);
+    renderDays();
+  });
+
+  $('save').addEventListener('click', async () => {
+    const days = Object.fromEntries(changed().map((d) => [d, sched.draft[d]]));
+    homebridge.showSpinner();
+    try {
+      const result = await homebridge.request('/schedules/save', { gatewayId: sched.gateway.gatewayId, program: sched.program, days });
+      const program = sched.gateway.programs.find((p) => p.id === sched.program);
+      program.days = result.days;
+      selectProgram(program.id);
+      const mismatch = Object.keys(days).filter((d) => !sameDay(days[d], result.days[d]));
+      if (mismatch.length) {
+        homebridge.toast.warning(`The thermostat reports different values for ${mismatch.map((d) => DAY_LABEL[d]).join(', ')}. Showing what it stored.`);
+      } else {
+        homebridge.toast.success(`Saved ${result.saved.length} day${result.saved.length === 1 ? '' : 's'} to the thermostat`);
+      }
+    } catch (err) {
+      homebridge.toast.error(err.message, 'Could not save schedule');
+    } finally {
+      homebridge.hideSpinner();
+    }
+  });
+
+
   (async () => {
     await ensureConfigBlock();
     homebridge.showSchemaForm();
     try {
-      show((await homebridge.request('/status')).loggedIn);
+      const { loggedIn } = await homebridge.request('/status');
+      show(loggedIn);
+      if (loggedIn) {
+        await loadSchedules();
+      }
     } catch (err) {
       $('status').textContent = `Couldn't check login: ${err.message}`;
     }

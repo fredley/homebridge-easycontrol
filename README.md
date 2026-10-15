@@ -19,6 +19,15 @@ It replaces the XMPP-based CT200 plugins. Those can't log in to accounts migrate
 
 When you change the target temperature while the zone follows its schedule, the plugin sets a temporary override by default. The override lasts until the next switch point, the same as turning the dial on the thermostat. To switch the zone to manual mode instead, set **Changing the temperature while on the schedule** to "Switch the zone to manual mode".
 
+## Schedules
+
+The Apple Home app can't show or edit thermostat schedules, so the plugin settings page in the Homebridge UI has a schedule editor:
+
+- **Choose a zone's schedule**: pick which of the thermostat's schedules each zone follows in schedule (Auto) mode, or none. With none, the zone holds a fixed temperature.
+- **Edit a schedule**: add, move or remove switch points for each day (up to 6 a day, in 15-minute steps), or copy one day to weekdays, the weekend or every day. A colour bar shows each day's temperatures at a glance.
+
+**Save to thermostat** writes only the days you changed, then reads them back from the thermostat. The plugin can't create new schedules or rename them; use the EasyControl app for that.
+
 ## Setup
 
 1. Install the plugin and open its settings in the Homebridge UI.

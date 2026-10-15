@@ -1,10 +1,25 @@
 import { HomebridgePluginUiServer, RequestError } from '@homebridge/plugin-ui-utils';
 
+import { PointtClient } from '../dist/api/client.js';
 import { exchangeCode, extractCode, startLogin } from '../dist/api/oauth.js';
 import { TokenStore } from '../dist/api/tokenStore.js';
+import { ScheduleError } from '../dist/schedule.js';
+import { assignProgram, loadSchedules, saveProgram } from '../dist/scheduleService.js';
 import { tokenPath } from '../dist/settings.js';
 
-class HomeComUiServer extends HomebridgePluginUiServer {
+// Surface API and validation errors to the page as toasts.
+const handled = (fn) => async (payload) => {
+  try {
+    return await fn(payload ?? {});
+  } catch (err) {
+    if (err instanceof RequestError) {
+      throw err;
+    }
+    throw new RequestError(err.message, { status: err instanceof ScheduleError ? 400 : 502 });
+  }
+};
+
+class EasyControlUiServer extends HomebridgePluginUiServer {
   constructor() {
     super();
     this.pending = undefined;
@@ -37,8 +52,21 @@ class HomeComUiServer extends HomebridgePluginUiServer {
       return { loggedIn: true };
     });
 
+    // A fresh TokenStore per request picks up refreshes made by the running plugin.
+    const client = () => new PointtClient(this.store());
+
+    this.onRequest('/schedules', handled(() => loadSchedules(client())));
+
+    this.onRequest('/schedules/save', handled(({ gatewayId, program, days }) =>
+      saveProgram(client(), gatewayId, Number(program), days)));
+
+    this.onRequest('/schedules/assign', handled(async ({ gatewayId, zone, program }) => {
+      await assignProgram(client(), gatewayId, zone, Number(program));
+      return { ok: true };
+    }));
+
     this.ready();
   }
 }
 
-(() => new HomeComUiServer())();
+(() => new EasyControlUiServer())();
