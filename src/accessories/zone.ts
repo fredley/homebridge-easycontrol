@@ -2,7 +2,7 @@ import type { CharacteristicValue, PlatformAccessory, Service } from 'homebridge
 
 import type { GatewayController } from '../gateway.js';
 import { isAvailable, isHeating, num, setpointWrites, str, SYSTEM_PATHS, zonePaths } from '../model.js';
-import type { HomeComPlatform } from '../platform.js';
+import type { EasyControlPlatform } from '../platform.js';
 
 /** One HomeKit Thermostat per CT200 zone. */
 export class ZoneAccessory {
@@ -10,7 +10,7 @@ export class ZoneAccessory {
   private readonly paths: ReturnType<typeof zonePaths>;
 
   constructor(
-    private readonly platform: HomeComPlatform,
+    private readonly platform: EasyControlPlatform,
     private readonly accessory: PlatformAccessory,
     private readonly gateway: GatewayController,
     private readonly zone: string,

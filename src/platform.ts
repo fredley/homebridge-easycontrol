@@ -8,19 +8,19 @@ import { TokenStore } from './api/tokenStore.js';
 import { GatewayController } from './gateway.js';
 import { decodeName, str, zoneIds, zonePaths } from './model.js';
 import {
-  DEFAULT_POLL_SECONDS, type HomeComConfig, MIN_POLL_SECONDS, PLATFORM_NAME, PLUGIN_NAME, tokenPath,
+  DEFAULT_POLL_SECONDS, type EasyControlConfig, MIN_POLL_SECONDS, PLATFORM_NAME, PLUGIN_NAME, tokenPath,
 } from './settings.js';
 
 const DISCOVERY_RETRY_MS = 60_000;
 
-export class HomeComPlatform implements DynamicPlatformPlugin {
-  readonly config: HomeComConfig;
+export class EasyControlPlatform implements DynamicPlatformPlugin {
+  readonly config: EasyControlConfig;
   private readonly cached = new Map<string, PlatformAccessory>();
   private readonly gateways: GatewayController[] = [];
 
   constructor(
     readonly log: Logging,
-    config: HomeComConfig,
+    config: EasyControlConfig,
     readonly api: API,
   ) {
     this.config = config;

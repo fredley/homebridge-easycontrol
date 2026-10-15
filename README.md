@@ -1,4 +1,4 @@
-# homebridge-homecom
+# homebridge-easycontrol
 
 Homebridge plugin for the **Bosch EasyControl CT200** thermostat, using the cloud API behind Bosch's HomeCom Easy and EasyControl apps (the "POINTT" API).
 
@@ -27,7 +27,7 @@ When you change the target temperature while the zone follows its schedule, the 
 4. Paste that URL into the plugin settings and click **Complete login**. The code expires after a few minutes.
 5. Restart the child bridge.
 
-The plugin stores tokens in `<homebridge storage>/homecom/tokens.json` and refreshes them automatically. Bosch's refresh tokens are single-use, so don't copy this file to a second Homebridge instance. Each instance needs its own login.
+The plugin stores tokens in `<homebridge storage>/easycontrol/tokens.json` and refreshes them automatically. Bosch's refresh tokens are single-use, so don't copy this file to a second Homebridge instance. Each instance needs its own login.
 
 ## Development
 
@@ -37,7 +37,7 @@ npm test             # unit tests
 npm run build
 npm run login        # CLI login -> .tokens.json (two steps; follow the prompts)
 npm run probe        # read-only dump of every gateway resource to fixtures/ (contains personal data, git-ignored)
-npx homebridge -D -I -U ./test-hb -P .   # run against test-hb/ (put tokens in test-hb/homecom/tokens.json)
+npx homebridge -D -I -U ./test-hb -P .   # run against test-hb/ (put tokens in test-hb/easycontrol/tokens.json)
 ```
 
 ## Credits

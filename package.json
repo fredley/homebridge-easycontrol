@@ -1,9 +1,18 @@
 {
-  "name": "homebridge-homecom",
-  "displayName": "Bosch HomeCom (CT200)",
+  "name": "homebridge-easycontrol",
+  "displayName": "Bosch EasyControl (CT200)",
   "version": "0.1.0",
   "description": "Homebridge plugin for Bosch EasyControl CT200 thermostats via the HomeCom (POINTT) cloud API",
   "license": "MIT",
+  "author": "Tom White",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fredley/homebridge-easycontrol.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fredley/homebridge-easycontrol/issues"
+  },
+  "homepage": "https://github.com/fredley/homebridge-easycontrol#readme",
   "type": "module",
   "main": "dist/index.js",
   "engines": {

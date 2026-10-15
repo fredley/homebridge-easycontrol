@@ -2,10 +2,10 @@ import type { PlatformConfig } from 'homebridge';
 
 import type { SetpointBehaviour } from './model.js';
 
-export const PLUGIN_NAME = 'homebridge-homecom';
-export const PLATFORM_NAME = 'HomeComPlatform';
+export const PLUGIN_NAME = 'homebridge-easycontrol';
+export const PLATFORM_NAME = 'EasyControl';
 
-export interface HomeComConfig extends PlatformConfig {
+export interface EasyControlConfig extends PlatformConfig {
   pollInterval?: number; // seconds
   setpointBehaviour?: SetpointBehaviour;
   boostTemperature?: number;
@@ -19,4 +19,4 @@ export const DEFAULT_POLL_SECONDS = 60;
 export const MIN_POLL_SECONDS = 30;
 export const REFRESH_AFTER_WRITE_MS = 4000;
 
-export const tokenPath = (storagePath: string) => `${storagePath}/homecom/tokens.json`;
+export const tokenPath = (storagePath: string) => `${storagePath}/easycontrol/tokens.json`;

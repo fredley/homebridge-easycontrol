@@ -1,8 +1,8 @@
 import type { API } from 'homebridge';
 
-import { HomeComPlatform } from './platform.js';
+import { EasyControlPlatform } from './platform.js';
 import { PLATFORM_NAME } from './settings.js';
 
 export default (api: API) => {
-  api.registerPlatform(PLATFORM_NAME, HomeComPlatform);
+  api.registerPlatform(PLATFORM_NAME, EasyControlPlatform);
 };

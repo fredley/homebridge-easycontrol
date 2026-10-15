@@ -2,7 +2,7 @@ import type { CharacteristicValue, PlatformAccessory, Service } from 'homebridge
 
 import type { GatewayController } from '../gateway.js';
 import { num, str, SYSTEM_PATHS, type Write } from '../model.js';
-import type { HomeComPlatform } from '../platform.js';
+import type { EasyControlPlatform } from '../platform.js';
 
 /** Gateway-wide extras: outdoor temperature, away mode and boost. */
 export class SystemAccessory {
@@ -11,7 +11,7 @@ export class SystemAccessory {
   private boost?: Service;
 
   constructor(
-    private readonly platform: HomeComPlatform,
+    private readonly platform: EasyControlPlatform,
     private readonly accessory: PlatformAccessory,
     private readonly gateway: GatewayController,
   ) {
