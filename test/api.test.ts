@@ -123,3 +123,21 @@ describe('PointtClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('TokenStore re-login', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('picks up tokens written by a new login when its own refresh fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('invalid_grant', { status: 400 })));
+    const { path, store } = await storeWith(60_000);
+    await store.load();
+    await writeFile(path, JSON.stringify({ accessToken: 'relogin', refreshToken: 'r9', expiresAt: Date.now() + 3_600_000 }));
+    expect(await store.accessToken()).toBe('relogin');
+  });
+
+  it('still fails when there is no newer login', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('invalid_grant', { status: 400 })));
+    const { store } = await storeWith(60_000);
+    await expect(store.accessToken()).rejects.toBeInstanceOf(AuthError);
+  });
+});

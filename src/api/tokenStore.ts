@@ -50,8 +50,19 @@ export class TokenStore {
   }
 
   private async refresh(): Promise<TokenSet> {
-    const next = await refreshTokens(this.tokens!.refreshToken);
-    await this.save(next);
-    return next;
+    const used = this.tokens!.refreshToken;
+    try {
+      const next = await refreshTokens(used);
+      await this.save(next);
+      return next;
+    } catch (err) {
+      // The user may have logged in again from the UI, which writes a new file.
+      const onDisk = await this.load();
+      if (onDisk && onDisk.refreshToken !== used) {
+        return Date.now() < onDisk.expiresAt - REFRESH_MARGIN_MS ? onDisk : this.refresh();
+      }
+      this.tokens = onDisk;
+      throw err;
+    }
   }
 }

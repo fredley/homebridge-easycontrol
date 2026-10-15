@@ -42,26 +42,34 @@ export class EasyControlPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  private async discover(): Promise<void> {
+  /** Retries until it succeeds, so logging in from the UI takes effect without a restart. */
+  private async discover(warned = false): Promise<void> {
+    const retry = () => setTimeout(() => void this.discover(true), DISCOVERY_RETRY_MS);
     const tokens = new TokenStore(tokenPath(this.api.user.storagePath()));
     if (!(await tokens.load())) {
-      this.log.error('Not logged in to Bosch HomeCom. Open the plugin settings in the Homebridge UI and log in.');
+      if (!warned) {
+        this.log.warn('Not logged in to Bosch. Log in from the plugin settings in the Homebridge UI; '
+          + 'the plugin will pick it up within a minute.');
+      }
+      retry();
       return;
     }
-    const client = new PointtClient(tokens);
     try {
-      await this.setup(client);
+      await this.setup(new PointtClient(tokens));
+      this.log.info('Connected to Bosch');
     } catch (err) {
-      if (err instanceof AuthError) {
-        this.log.error(`${err.message}. Log in again from the plugin settings in the Homebridge UI.`);
-        return;
+      if (!warned) {
+        this.log.warn(err instanceof AuthError
+          ? `${err.message}. Log in again from the plugin settings in the Homebridge UI.`
+          : `Discovery failed (${(err as Error).message}); retrying every ${DISCOVERY_RETRY_MS / 1000}s`);
       }
-      this.log.warn(`Discovery failed (${(err as Error).message}); retrying in ${DISCOVERY_RETRY_MS / 1000}s`);
-      setTimeout(() => void this.discover(), DISCOVERY_RETRY_MS);
+      retry();
     }
   }
 
   private async setup(client: PointtClient): Promise<void> {
+    // A retry after a partial failure starts from scratch.
+    this.gateways.splice(0).forEach((g) => g.stop());
     const pollMs = Math.max(this.config.pollInterval ?? DEFAULT_POLL_SECONDS, MIN_POLL_SECONDS) * 1000;
     const gateways = (await client.getGateways()).filter((g) => g.deviceType === 'rrc2');
     if (!gateways.length) {
