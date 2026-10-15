@@ -29,7 +29,7 @@
 
   function show(loggedIn) {
     $('status').textContent = loggedIn
-      ? 'Logged in. Restart Homebridge (or the child bridge) after logging in for the first time.'
+      ? 'Logged in to Bosch. If the thermostat is missing, make sure these settings are saved, then restart Homebridge.'
       : 'Not logged in.';
     $('login').style.display = loggedIn ? 'none' : '';
     $('relogin').style.display = loggedIn ? '' : 'none';
@@ -40,11 +40,25 @@
     window.open(url, '_blank', 'noopener');
   });
 
+  // Homebridge only starts the plugin (and offers child bridge settings) once a
+  // platform block exists in config.json, so create one if there isn't one yet.
+  async function ensureConfigBlock() {
+    const blocks = await homebridge.getPluginConfig();
+    if (blocks.length) {
+      return false;
+    }
+    await homebridge.updatePluginConfig([{ platform: 'EasyControl', name: 'Bosch CT200' }]);
+    return true;
+  }
+
   $('finish').addEventListener('click', async () => {
     homebridge.showSpinner();
     try {
       await homebridge.request('/finish', { callbackUrl: $('callback').value });
-      homebridge.toast.success('Logged in to Bosch HomeCom');
+      if (await ensureConfigBlock()) {
+        await homebridge.savePluginConfig();
+      }
+      homebridge.toast.success('Logged in to Bosch. Restart Homebridge to load the thermostat.');
       $('callback').value = '';
       show(true);
     } catch (err) {
@@ -57,6 +71,7 @@
   $('relogin').addEventListener('click', () => show(false));
 
   (async () => {
+    await ensureConfigBlock();
     homebridge.showSchemaForm();
     try {
       show((await homebridge.request('/status')).loggedIn);
