@@ -4,3 +4,4 @@ fixtures/
 .tokens.json
 test-hb/
 .login-pending.json
+*.tgz
